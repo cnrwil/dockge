@@ -24,28 +24,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      # node-pty requires python3 + make + g++ to compile native bindings
-      - name: Install native build tools
-        run: sudo apt-get install -y python3 make g++
-
-      # Install ALL deps (devDeps needed for vite frontend build)
-      - name: Install dependencies
-        run: npm ci
-
-      # Build the Vue frontend
-      - name: Build frontend
-        run: npm run build:frontend
-
-      # Strip devDependencies - only production deps go into the image
-      - name: Prune dev dependencies
-        run: npm prune --omit=dev
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -68,8 +46,6 @@ jobs:
             type=semver,pattern={{major}}
             type=sha,prefix=sha-,format=short
 
-      # node_modules are compiled on linux/amd64 runner so we only target amd64.
-      # The COPY in the Dockerfile brings in the pre-built node_modules directly.
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
