@@ -1,17 +1,10 @@
-# Should be identical to .gitignore
-.env
-node_modules
-.idea
-data
-stacks
-tmp
-/private
-
-# Docker extra
-docker
-frontend
-.editorconfig
-.eslintrc.cjs
+# Ignore everything by default, then whitelist what we need.
+# This is critical - we COPY specific dirs in the Dockerfile,
+# so everything else should be excluded to keep the context small.
 .git
-.gitignore
-README.md
+.github
+frontend
+docker
+*.md
+*.log
+.env*
