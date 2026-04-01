@@ -30,6 +30,7 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      # Install ALL deps (including devDeps) so we can build the frontend
       - name: Install dependencies
         run: npm ci
 
