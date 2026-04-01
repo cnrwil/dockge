@@ -1,11 +1,6 @@
 import { library } from "@fortawesome/fontawesome-svg-core";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 
-// Add Free Font Awesome Icons
-// https://fontawesome.com/v6/icons?d=gallery&p=2&s=solid&m=free
-// In order to add an icon, you have to:
-// 1) add the icon name in the import statement below;
-// 2) add the icon name to the library.add() statement below.
 import {
     faArrowAltCircleUp,
     faCog,
@@ -51,9 +46,22 @@ import {
     faInfoCircle,
     faClone,
     faCertificate,
-    faTerminal, faWarehouse, faHome, faRocket,
+    faTerminal,
+    faWarehouse,
+    faHome,
+    faRocket,
     faRotate,
-    faCloudArrowDown, faArrowsRotate,
+    faCloudArrowDown,
+    faArrowsRotate,
+    // New feature icons
+    faUsers,
+    faClipboardList,
+    faTags,
+    faProjectDiagram,
+    faClock,
+    faFileArchive,
+    faMicrochip,
+    faHistory,
 } from "@fortawesome/free-solid-svg-icons";
 
 library.add(
@@ -95,7 +103,6 @@ library.add(
     faUndo,
     faPlusCircle,
     faAngleDown,
-    faLink,
     faWrench,
     faHeartbeat,
     faFilter,
@@ -109,7 +116,15 @@ library.add(
     faRotate,
     faCloudArrowDown,
     faArrowsRotate,
+    // New feature icons
+    faUsers,
+    faClipboardList,
+    faTags,
+    faProjectDiagram,
+    faClock,
+    faFileArchive,
+    faMicrochip,
+    faHistory,
 );
 
 export { FontAwesomeIcon };
-
