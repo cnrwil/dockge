@@ -1,7 +1,7 @@
 services:
   dockge:
     container_name: dockge
-    image: louislam/dockge:1
+    image: ghcr.io/cnrwil/dockge:latest
     restart: unless-stopped
     ports:
       # Host Port : Container Port
