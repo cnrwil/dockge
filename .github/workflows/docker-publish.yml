@@ -30,20 +30,21 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      # Install ALL deps on the host runner (native modules compile for linux/amd64 here)
+      # node-pty requires python3 + make + g++ to compile native bindings
+      - name: Install native build tools
+        run: sudo apt-get install -y python3 make g++
+
+      # Install ALL deps (devDeps needed for vite frontend build)
       - name: Install dependencies
         run: npm ci
 
-      # Build the Vue frontend on the host runner
+      # Build the Vue frontend
       - name: Build frontend
         run: npm run build:frontend
 
-      # Prune devDependencies so only production modules go into the image
+      # Strip devDependencies - only production deps go into the image
       - name: Prune dev dependencies
         run: npm prune --omit=dev
-
-      - name: Set up QEMU (multi-arch support)
-        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -67,14 +68,13 @@ jobs:
             type=semver,pattern={{major}}
             type=sha,prefix=sha-,format=short
 
+      # node_modules are compiled on linux/amd64 runner so we only target amd64.
+      # The COPY in the Dockerfile brings in the pre-built node_modules directly.
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./docker/Standalone.Dockerfile
-          # amd64 only for now - node_modules are compiled on the host runner
-          # which is always linux/amd64. Multi-arch native modules require
-          # cross-compilation setup beyond the scope of this workflow.
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
