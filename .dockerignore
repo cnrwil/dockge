@@ -1,10 +1,7 @@
-# Ignore everything by default, then whitelist what we need.
-# This is critical - we COPY specific dirs in the Dockerfile,
-# so everything else should be excluded to keep the context small.
 .git
 .github
-frontend
 docker
 *.md
 *.log
 .env*
+frontend-dist
