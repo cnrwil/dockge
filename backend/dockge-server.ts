@@ -36,7 +36,17 @@ import { AgentProxySocketHandler } from "./socket-handlers/agent-proxy-socket-ha
 import { AgentSocketHandler } from "./agent-socket-handler";
 import { AgentSocket } from "../common/agent-socket";
 import { ManageAgentSocketHandler } from "./socket-handlers/manage-agent-socket-handler";
+// Feature handlers
 import { UserManagementSocketHandler } from "./socket-handlers/user-management-socket-handler";
+import { AuditLogSocketHandler } from "./socket-handlers/audit-log-socket-handler";
+import { StackTagsSocketHandler } from "./socket-handlers/stack-tags-socket-handler";
+import { StackDependenciesSocketHandler } from "./socket-handlers/stack-dependencies-socket-handler";
+import { ScheduledTasksSocketHandler } from "./socket-handlers/scheduled-tasks-socket-handler";
+import { StackBackupSocketHandler } from "./socket-handlers/stack-backup-socket-handler";
+import { ResourceUsageSocketHandler } from "./socket-handlers/resource-usage-socket-handler";
+import { ComposeValidationSocketHandler } from "./socket-handlers/compose-validation-socket-handler";
+import { ComposeHistorySocketHandler } from "./socket-handlers/compose-history-socket-handler";
+import { startScheduler } from "./scheduler";
 import { Terminal } from "./terminal";
 import { UserRole } from "../common/roles";
 
@@ -55,7 +65,16 @@ export class DockgeServer {
     socketHandlerList : SocketHandler[] = [
         new MainSocketHandler(),
         new ManageAgentSocketHandler(),
+        // Feature handlers
         new UserManagementSocketHandler(),
+        new AuditLogSocketHandler(),
+        new StackTagsSocketHandler(),
+        new StackDependenciesSocketHandler(),
+        new ScheduledTasksSocketHandler(),
+        new StackBackupSocketHandler(),
+        new ResourceUsageSocketHandler(),
+        new ComposeValidationSocketHandler(),
+        new ComposeHistorySocketHandler(),
     ];
 
     agentProxySocketHandler = new AgentProxySocketHandler();
@@ -77,18 +96,10 @@ export class DockgeServer {
         process.addListener("unhandledRejection", unexpectedErrorHandler);
         process.addListener("uncaughtException", unexpectedErrorHandler);
 
-        if (!process.env.NODE_ENV) {
-            process.env.NODE_ENV = "production";
-        }
-
+        if (!process.env.NODE_ENV) process.env.NODE_ENV = "production";
         log.info("server", "NODE_ENV: " + process.env.NODE_ENV);
 
-        let defaultStacksDir;
-        if (process.platform === "win32") {
-            defaultStacksDir = "./stacks";
-        } else {
-            defaultStacksDir = "/opt/stacks";
-        }
+        let defaultStacksDir = process.platform === "win32" ? "./stacks" : "/opt/stacks";
 
         let args = parse<Arguments>({
             sslKey: { type: String, optional: true },
@@ -113,7 +124,6 @@ export class DockgeServer {
         this.stacksDir = this.config.stacksDir;
 
         log.debug("server", this.config);
-
         this.packageJSON = packageJSON as PackageJson;
 
         try {
@@ -139,31 +149,21 @@ export class DockgeServer {
             this.httpServer = http.createServer(this.app);
         }
 
-        for (const router of this.routerList) {
-            this.app.use(router.create(this.app, this));
-        }
+        for (const router of this.routerList) this.app.use(router.create(this.app, this));
 
         this.app.use("/", expressStaticGzip("frontend-dist", { enableBrotli: true }));
+        this.app.get("*", async (_request, response) => { response.send(this.indexHTML); });
 
-        this.app.get("*", async (_request, response) => {
-            response.send(this.indexHTML);
-        });
-
-        let cors = undefined;
-        if (isDev) {
-            cors = { origin: "*" };
-        }
+        let cors = isDev ? { origin: "*" } : undefined;
 
         this.io = new socketIO.Server(this.httpServer, {
             cors,
             allowRequest: (req, callback) => {
                 let isOriginValid = true;
                 const bypass = isDev || process.env.UPTIME_KUMA_WS_ORIGIN_CHECK === "bypass";
-
                 if (!bypass) {
                     let host = req.headers.host;
                     let origin = req.headers.origin;
-
                     if (origin) {
                         try {
                             let originURL = new URL(origin);
@@ -181,7 +181,6 @@ export class DockgeServer {
                 } else {
                     log.debug("auth", "Origin check is bypassed");
                 }
-
                 callback(null, isOriginValid);
             }
         });
@@ -198,11 +197,9 @@ export class DockgeServer {
                 dockgeSocket.emit("agent", event, ...args);
             };
 
-            if (typeof(socket.request.headers.endpoint) === "string") {
-                dockgeSocket.endpoint = socket.request.headers.endpoint;
-            } else {
-                dockgeSocket.endpoint = "";
-            }
+            dockgeSocket.endpoint = typeof socket.request.headers.endpoint === "string"
+                ? socket.request.headers.endpoint
+                : "";
 
             if (dockgeSocket.endpoint) {
                 log.info("server", "Socket connected (agent), as endpoint " + dockgeSocket.endpoint);
@@ -217,16 +214,10 @@ export class DockgeServer {
                 dockgeSocket.emit("setup");
             }
 
-            for (const socketHandler of this.socketHandlerList) {
-                socketHandler.create(dockgeSocket, this);
-            }
+            for (const socketHandler of this.socketHandlerList) socketHandler.create(dockgeSocket, this);
 
             let agentSocket = new AgentSocket();
-
-            for (const socketHandler of this.agentSocketHandlerList) {
-                socketHandler.create(dockgeSocket, this, agentSocket);
-            }
-
+            for (const socketHandler of this.agentSocketHandlerList) socketHandler.create(dockgeSocket, this, agentSocket);
             this.agentProxySocketHandler.create2(dockgeSocket, this, agentSocket);
 
             log.debug("auth", "check auto login");
@@ -255,14 +246,13 @@ export class DockgeServer {
 
     async afterLogin(socket : DockgeSocket, user : User) {
         socket.userID = user.id;
-        // Set userRole from DB so checkRole() works on every socket event
+        // Set role and username on socket for role checks and audit logging
         socket.userRole = (user.role ?? "operator") as UserRole;
-        // Expose username on socket for audit logging convenience
         (socket as any).username = user.username;
 
         socket.join(user.id.toString());
 
-        // Tell the frontend what role this session has
+        // Inform the frontend of the session role
         socket.emit("userRole", socket.userRole);
 
         this.sendInfo(socket);
@@ -283,14 +273,11 @@ export class DockgeServer {
         try {
             await Database.init(this);
         } catch (e) {
-            if (e instanceof Error) {
-                log.error("server", "Failed to prepare your database: " + e.message);
-            }
+            if (e instanceof Error) log.error("server", "Failed to prepare your database: " + e.message);
             process.exit(1);
         }
 
-        let jwtSecretBean = await R.findOne("setting", " `key` = ? ", [ "jwtSecret" ]);
-
+        let jwtSecretBean = await R.findOne("setting", " `key` = ? ", ["jwtSecret"]);
         if (!jwtSecretBean) {
             log.info("server", "JWT secret is not found, generate one.");
             jwtSecretBean = await this.initJWTSecret();
@@ -298,12 +285,10 @@ export class DockgeServer {
         } else {
             log.debug("server", "Load JWT secret from database.");
         }
-
         this.jwtSecret = jwtSecretBean.value;
 
         const userCount = (await R.knex("user").count("id as count").first()).count;
         log.debug("server", "User count: " + userCount);
-
         if (userCount == 0) {
             log.info("server", "No user, need setup");
             this.needSetup = true;
@@ -323,6 +308,9 @@ export class DockgeServer {
             checkVersion.startInterval();
         });
 
+        // Start the scheduled task runner after DB is ready
+        await startScheduler(this);
+
         gracefulShutdown(this.httpServer, {
             signals: "SIGINT SIGTERM",
             timeout: 30000,
@@ -334,16 +322,12 @@ export class DockgeServer {
     }
 
     async sendInfo(socket : Socket, hideVersion = false) {
-        let versionProperty;
-        let latestVersionProperty;
-        let isContainer;
-
+        let versionProperty, latestVersionProperty, isContainer;
         if (!hideVersion) {
             versionProperty = packageJSON.version;
             latestVersionProperty = checkVersion.latestVersion;
             isContainer = (process.env.DOCKGE_IS_CONTAINER === "1");
         }
-
         socket.emit("info", {
             version: versionProperty,
             latestVersion: latestVersionProperty,
@@ -353,34 +337,20 @@ export class DockgeServer {
     }
 
     async getClientIP(socket : Socket) : Promise<string> {
-        let clientIP = socket.client.conn.remoteAddress;
-        if (clientIP === undefined) clientIP = "";
-
+        let clientIP = socket.client.conn.remoteAddress ?? "";
         if (await Settings.get("trustProxy")) {
             const forwardedFor = socket.client.conn.request.headers["x-forwarded-for"];
-            if (typeof forwardedFor === "string") {
-                return forwardedFor.split(",")[0].trim();
-            } else if (typeof socket.client.conn.request.headers["x-real-ip"] === "string") {
-                return socket.client.conn.request.headers["x-real-ip"];
-            }
+            if (typeof forwardedFor === "string") return forwardedFor.split(",")[0].trim();
+            if (typeof socket.client.conn.request.headers["x-real-ip"] === "string") return socket.client.conn.request.headers["x-real-ip"];
         }
         return clientIP.replace(/^::ffff:/, "");
     }
 
     async getTimezone() {
-        try {
-            if (process.env.TZ) { this.checkTimezone(process.env.TZ); return process.env.TZ; }
-        } catch (e) { if (e instanceof Error) log.warn("timezone", e.message + " in process.env.TZ"); }
-
+        try { if (process.env.TZ) { this.checkTimezone(process.env.TZ); return process.env.TZ; } } catch (e) { if (e instanceof Error) log.warn("timezone", e.message + " in process.env.TZ"); }
         const timezone = await Settings.get("serverTimezone");
-        try {
-            if (timezone) { this.checkTimezone(timezone); return timezone; }
-        } catch (e) { if (e instanceof Error) log.warn("timezone", e.message + " in settings"); }
-
-        try {
-            const guess = dayjs.tz.guess();
-            if (guess) { this.checkTimezone(guess); return guess; } else return "UTC";
-        } catch (e) { return "UTC"; }
+        try { if (timezone) { this.checkTimezone(timezone); return timezone; } } catch (e) { if (e instanceof Error) log.warn("timezone", e.message + " in settings"); }
+        try { const guess = dayjs.tz.guess(); if (guess) { this.checkTimezone(guess); return guess; } return "UTC"; } catch (e) { return "UTC"; }
     }
 
     getTimezoneOffset() { return dayjs().format("Z"); }
@@ -398,11 +368,8 @@ export class DockgeServer {
     }
 
     async initJWTSecret() : Promise<Bean> {
-        let jwtSecretBean = await R.findOne("setting", " `key` = ? ", [ "jwtSecret" ]);
-        if (!jwtSecretBean) {
-            jwtSecretBean = R.dispense("setting");
-            jwtSecretBean.key = "jwtSecret";
-        }
+        let jwtSecretBean = await R.findOne("setting", " `key` = ? ", ["jwtSecret"]);
+        if (!jwtSecretBean) { jwtSecretBean = R.dispense("setting"); jwtSecretBean.key = "jwtSecret"; }
         jwtSecretBean.value = generatePasswordHash(genSecret());
         await R.store(jwtSecretBean);
         return jwtSecretBean;
@@ -411,31 +378,22 @@ export class DockgeServer {
     async sendStackList(useCache = false) {
         let socketList = this.io.sockets.sockets.values();
         let stackList;
-
         for (let socket of socketList) {
             let dockgeSocket = socket as DockgeSocket;
             if (dockgeSocket.userID) {
                 if (!stackList) stackList = await Stack.getStackList(this, useCache);
-
                 let map : Map<string, object> = new Map();
-                for (let [ stackName, stack ] of stackList) {
-                    map.set(stackName, stack.toSimpleJSON(dockgeSocket.endpoint));
-                }
-
+                for (let [stackName, stack] of stackList) map.set(stackName, stack.toSimpleJSON(dockgeSocket.endpoint));
                 log.debug("server", "Send stack list to user: " + dockgeSocket.id + " (" + dockgeSocket.endpoint + ")");
-                dockgeSocket.emitAgent("stackList", {
-                    ok: true,
-                    stackList: Object.fromEntries(map),
-                });
+                dockgeSocket.emitAgent("stackList", { ok: true, stackList: Object.fromEntries(map) });
             }
         }
     }
 
     async getDockerNetworkList() : Promise<string[]> {
-        let res = await childProcessAsync.spawn("docker", [ "network", "ls", "--format", "{{.Name}}" ], { encoding: "utf-8" });
+        let res = await childProcessAsync.spawn("docker", ["network", "ls", "--format", "{{.Name}}"], { encoding: "utf-8" });
         if (!res.stdout) return [];
-        let list = res.stdout.toString().split("\n");
-        return list.filter((item) => item !== "").sort((a, b) => a.localeCompare(b));
+        return res.stdout.toString().split("\n").filter((item) => item !== "").sort((a, b) => a.localeCompare(b));
     }
 
     get stackDirFullPath() { return path.resolve(this.stacksDir); }
