@@ -2,99 +2,108 @@
     <img src="./frontend/public/icon.svg" width="128" alt="" />
 </div>
 
-# Dockge
+# Dockge (cnrwil fork)
 
-A fancy, easy-to-use and reactive self-hosted docker compose.yaml stack-oriented manager.
+A fancy, easy-to-use and reactive self-hosted docker compose.yaml stack-oriented manager — extended with multi-user access control, audit logging, stack tagging, scheduled tasks, backup/export, resource monitoring, compose validation, and a diff view.
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/louislam/dockge?logo=github&style=flat)](https://github.com/louislam/dockge) [![Docker Pulls](https://img.shields.io/docker/pulls/louislam/dockge?logo=docker)](https://hub.docker.com/r/louislam/dockge/tags) [![Docker Image Version (latest semver)](https://img.shields.io/docker/v/louislam/dockge/latest?label=docker%20image%20ver.)](https://hub.docker.com/r/louislam/dockge/tags) [![GitHub last commit (branch)](https://img.shields.io/github/last-commit/louislam/dockge/master?logo=github)](https://github.com/louislam/dockge/commits/master/)
+[![GitHub Repo stars](https://img.shields.io/github/stars/cnrwil/dockge?logo=github&style=flat)](https://github.com/cnrwil/dockge) [![GitHub last commit (branch)](https://img.shields.io/github/last-commit/cnrwil/dockge/master?logo=github)](https://github.com/cnrwil/dockge/commits/master/)
 
-<img src="https://github.com/louislam/dockge/assets/1336778/26a583e1-ecb1-4a8d-aedf-76157d714ad7" width="900" alt="" />
+> **Forked from** [louislam/dockge](https://github.com/louislam/dockge). All original features are preserved.
 
-View Video: https://youtu.be/AWAlOQeNpgU?t=48
+---
 
 ## ⭐ Features
 
-- 🧑‍💼 Manage your `compose.yaml` files
-  - Create/Edit/Start/Stop/Restart/Delete
-  - Update Docker Images
-- ⌨️ Interactive Editor for `compose.yaml`
-- 🦦 Interactive Web Terminal
-- 🕷️ (1.4.0 🆕) Multiple agents support - You can manage multiple stacks from different Docker hosts in one single interface
-- 🏪 Convert `docker run ...` commands into `compose.yaml`
-- 📙 File based structure - Dockge won't kidnap your compose files, they are stored on your drive as usual. You can interact with them using normal `docker compose` commands
+### Original features
+- 🧑‍💼 Manage your `compose.yaml` files — Create / Edit / Start / Stop / Restart / Delete / Update images
+- ⌨️ Interactive editor for `compose.yaml`
+- 🦦 Interactive web terminal
+- 🕷️ Multiple agents support — manage stacks across different Docker hosts from one interface
+- 🏦 Convert `docker run ...` commands into `compose.yaml`
+- 📙 File-based structure — compose files live on your drive and work with normal `docker compose` commands
+- 🚄 Reactive — real-time progress and terminal output
+- 🐣 Easy-to-use & fancy UI
 
-<img src="https://github.com/louislam/dockge/assets/1336778/cc071864-592e-4909-b73a-343a57494002" width=300 />
+### 🔒 Multi-user support with role-based access control
+Three roles with clearly defined permissions:
+| Role | What they can do |
+|---|---|
+| **Admin** | Full access including user management and settings |
+| **Operator** | Start / stop / create / edit / delete stacks and use the terminal |
+| **Viewer** | Read-only — view stacks and logs |
 
-- 🚄 Reactive - Everything is just responsive. Progress (Pull/Up/Down) and terminal output are in real-time
-- 🐣 Easy-to-use & fancy UI - If you love Uptime Kuma's UI/UX, you will love this one too
+Admins can create, deactivate, delete users and reset passwords from a dedicated User Management page.
 
-![](https://github.com/louislam/dockge/assets/1336778/89fc1023-b069-42c0-a01c-918c495f1a6a)
+### 📝 Audit log
+Every significant action is recorded — who did what, when, and from which IP. Covers auth events (login, failed login, token login), all stack operations, user management changes, and settings updates. The admin UI offers paginated browsing, filtering by user or action category, and a pruning tool for old entries.
+
+### 🏷️ Stack groups and tagging
+Attach colour-coded free-form tags to any stack. Tags are displayed inline on stack cards and can be used to group stacks in the sidebar. Tags can be renamed or deleted globally across all stacks at once.
+
+### 🔗 Stack dependencies
+Declare that one stack must be running before another starts. The `Start with dependencies` command polls every 3 seconds (up to 120 seconds) until all declared dependencies are in a running state before starting the target stack. Circular dependencies are detected and rejected at save time.
+
+### ⏰ Scheduled tasks
+Schedule cron-based tasks against any stack — start, stop, restart, or pull/update images on a schedule. Uses standard 5-field cron expressions. Tasks can be enabled/disabled individually without being deleted, and the last run time is recorded.
+
+### 📦 Stack backup and export
+Export any stack as a ZIP archive containing its `compose.yaml` and `.env` file with a single click. The browser download is triggered automatically. Stacks can also be restored from a previously exported ZIP.
+
+### 📊 Per-stack resource usage
+View a real-time snapshot of CPU %, memory usage, and network I/O for every container in a stack, with a summary view showing totals. Data is pulled from `docker stats --no-stream` and can be refreshed on demand.
+
+### ✅ Compose validation before deploy
+As you type in the compose editor, your YAML is validated in real-time using `docker compose config`. Errors are shown in a red banner with the exact error message from Docker. Warnings (e.g. obsolete fields) appear in yellow. The check is debounced at 800ms so it doesn't fire on every keystroke.
+
+### 🔍 Diff view on edit
+Before saving or deploying, a git-style diff is shown comparing the current compose YAML against the previously saved version. The last 20 versions of each stack's compose file are stored in the database and can be browsed or restored from the history panel.
+
+---
 
 ## 🔧 How to Install
 
 Requirements:
 - [Docker](https://docs.docker.com/engine/install/) 20+ / Podman
-- (Podman only) podman-docker (Debian: `apt install podman-docker`)
-- OS:
-  - Major Linux distros that can run Docker/Podman such as:
-     - ✅ Ubuntu
-     - ✅ Debian (Bullseye or newer)
-     - ✅ Raspbian (Bullseye or newer)
-     - ✅ CentOS
-     - ✅ Fedora
-     - ✅ ArchLinux
-  - ❌ Debian/Raspbian Buster or lower is not supported
-  - ❌ Windows (Will be supported later)
-- Arch: armv7, arm64, amd64 (a.k.a x86_64)
+- (Podman only) `podman-docker` (Debian: `apt install podman-docker`)
+- A Docker network named `reverseproxy-nw` must exist (see below)
+- OS: Ubuntu, Debian (Bullseye+), Raspbian (Bullseye+), CentOS, Fedora, ArchLinux
+- Arch: armv7, arm64, amd64
 
-### Basic
+### Create the reverse proxy network (once)
 
-- Default Stacks Directory: `/opt/stacks`
-- Default Port: 5001
-
+```bash
+docker network create reverseproxy-nw
 ```
-# Create directories that store your stacks and stores Dockge's stack
+
+This fork does not expose any ports directly. Dockge should be accessed via a reverse proxy (e.g. Nginx Proxy Manager, Traefik, Caddy) connected to the `reverseproxy-nw` network.
+
+### Install
+
+```bash
 mkdir -p /opt/stacks /opt/dockge
 cd /opt/dockge
 
 # Download the compose.yaml
-curl https://raw.githubusercontent.com/louislam/dockge/master/compose.yaml --output compose.yaml
+curl https://raw.githubusercontent.com/cnrwil/dockge/master/compose.yaml --output compose.yaml
 
 # Start the server
 docker compose up -d
-
-# If you are using docker-compose V1 or Podman
-# docker-compose up -d
 ```
 
-Dockge is now running on http://localhost:5001
+Dockge will be available via your reverse proxy. The internal application port is **5001**.
 
-### Advanced
-
-If you want to store your stacks in another directory, you can generate your compose.yaml file by using the following URL with custom query strings.
-
-```
-# Download your compose.yaml
-curl "https://dockge.kuma.pet/compose.yaml?port=5001&stacksPath=/opt/stacks" --output compose.yaml
-```
-
-- port=`5001`
-- stacksPath=`/opt/stacks`
-
-Interactive compose.yaml generator is available on: 
-https://dockge.kuma.pet
-
-## How to Update
+### How to Update
 
 ```bash
 cd /opt/dockge
 docker compose pull && docker compose up -d
 ```
 
-## Screenshots
+---
+
+## 📸 Screenshots
 
 ![](https://github.com/louislam/dockge/assets/1336778/e7ff0222-af2e-405c-b533-4eab04791b40)
-
 
 ![](https://github.com/louislam/dockge/assets/1336778/7139e88c-77ed-4d45-96e3-00b66d36d871)
 
@@ -102,63 +111,34 @@ docker compose pull && docker compose up -d
 
 ![](https://github.com/louislam/dockge/assets/1336778/a4478d23-b1c4-4991-8768-1a7cad3472e3)
 
-
-## Motivations
-
-- I have been using Portainer for some time, but for the stack management, I am sometimes not satisfied with it. For example, sometimes when I try to deploy a stack, the loading icon keeps spinning for a few minutes without progress. And sometimes error messages are not clear.
-- Try to develop with ES Module + TypeScript
-
-If you love this project, please consider giving it a ⭐.
-
+---
 
 ## 🗣️ Community and Contribution
 
-### Bug Report
-https://github.com/louislam/dockge/issues
+### Bug Reports
+https://github.com/cnrwil/dockge/issues
 
-### Ask for Help / Discussions
-https://github.com/louislam/dockge/discussions
+### Upstream Project
+https://github.com/louislam/dockge
 
-### Translation
-If you want to translate Dockge into your language, please read [Translation Guide](https://github.com/louislam/dockge/blob/master/frontend/src/lang/README.md)
-
-### Create a Pull Request
-
-Be sure to read the [guide](https://github.com/louislam/dockge/blob/master/CONTRIBUTING.md), as we don't accept all types of pull requests and don't want to waste your time.
+---
 
 ## FAQ
 
-#### "Dockge"?
-
-"Dockge" is a coinage word which is created by myself. I originally hoped it sounds like `Dodge`, but apparently many people called it `Dockage`, it is also acceptable.
-
-The naming idea came from Twitch emotes like `sadge`, `bedge` or `wokege`. They all end in `-ge`.
-
 #### Can I manage a single container without `compose.yaml`?
-
-The main objective of Dockge is to try to use the docker `compose.yaml` for everything. If you want to manage a single container, you can just use Portainer or Docker CLI.
+The main objective of Dockge is docker-compose stack management. For single containers, use Portainer or the Docker CLI.
 
 #### Can I manage existing stacks?
+Yes. Move your compose file into `/opt/stacks/<stackName>/compose.yaml`, then click **Scan Stacks Folder** in the top-right dropdown.
 
-Yes, you can. However, you need to move your compose file into the stacks directory:
+#### Can I use a port directly instead of a reverse proxy?
+Yes — add a `ports` section back to `compose.yaml` and remove the `networks` block if you prefer direct port access.
 
-1. Stop your stack
-2. Move your compose file into `/opt/stacks/<stackName>/compose.yaml`
-3. In Dockge, click the " Scan Stacks Folder" button in the top-right corner's dropdown menu
-4. Now you should see your stack in the list
+#### Is this a Portainer replacement?
+For compose-only workflows, yes. For managing individual containers or Docker networks directly, Portainer is still more capable.
 
-#### Is Dockge a Portainer replacement?
-
-Yes or no. Portainer provides a lot of Docker features. While Dockge is currently only focusing on docker-compose with a better user interface and better user experience.
-
-If you want to manage your container with docker-compose only, the answer may be yes.
-
-If you still need to manage something like docker networks, single containers, the answer may be no.
-
-#### Can I install both Dockge and Portainer?
-
-Yes, you can.
+---
 
 ## Others
 
-Dockge is built on top of [Compose V2](https://docs.docker.com/compose/migrate/). `compose.yaml`  also known as `docker-compose.yml`.
+Dockge is built on top of [Compose V2](https://docs.docker.com/compose/migrate/). `compose.yaml` is also known as `docker-compose.yml`.
