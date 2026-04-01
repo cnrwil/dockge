@@ -24,23 +24,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install system build tools
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends python3 make g++
-
-      - name: Install all dependencies
-        run: npm install
-
-      - name: Build frontend
-        run: npm run build:frontend
-
-      - name: Prune to production dependencies only
-        run: npm prune --omit=dev
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -59,8 +42,6 @@ jobs:
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
             type=sha,prefix=sha-,format=short
 
       - name: Build and push Docker image
