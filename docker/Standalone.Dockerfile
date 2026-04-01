@@ -1,49 +1,30 @@
 ############################################
 # Standalone Dockerfile for cnrwil/dockge
-# Does not depend on upstream louislam images.
-# Frontend is pre-built in CI before this runs.
+#
+# node_modules and frontend-dist are pre-built
+# on the CI runner and copied in directly.
+# No npm install runs inside Docker.
 ############################################
-FROM node:22-alpine AS base
+FROM node:22-alpine
 
-# Build tools needed for native modules (node-pty)
-RUN apk add --no-cache \
-    dumb-init \
-    python3 \
-    make \
-    g++ \
-    linux-headers
+RUN apk add --no-cache dumb-init
 
 WORKDIR /app
 
-############################################
-# Install production dependencies
-# (native modules compiled here)
-############################################
-FROM base AS deps
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+# Pre-built production node_modules (pruned on CI runner)
+COPY node_modules ./node_modules
 
-############################################
-# Main release image
-############################################
-FROM base AS release
-WORKDIR /app
+# Pre-built frontend
+COPY frontend-dist ./frontend-dist
 
-# Production node_modules (with compiled native binaries)
-COPY --from=deps /app/node_modules ./node_modules
-
-# Pre-built frontend dist from CI
-COPY ./frontend-dist ./frontend-dist
-
-# Backend source, common, extra, etc.
-COPY ./backend ./backend
-COPY ./common ./common
-COPY ./extra ./extra
-COPY ./package.json ./package.json
+# Backend source
+COPY backend ./backend
+COPY common ./common
+COPY extra ./extra
+COPY package.json ./package.json
 
 RUN mkdir -p ./data
 
-# Disable io_uring to avoid node-pty issues on newer kernels
 ENV UV_USE_IO_URING=0
 ENV NODE_ENV=production
 
