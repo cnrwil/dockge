@@ -1,12 +1,13 @@
 <template>
   <div>
-    <h6 class="mb-2"><font-awesome-icon icon="file-archive" class="me-2" />Backup &amp; Export</h6>
-    <button class="btn btn-sm btn-normal" :disabled="exporting" @click="exportStack">
+    <h6 class="mb-2">Backup &amp; Export</h6>
+    <p class="text-muted mb-2" style="font-size:0.85em">Export this stack's compose.yaml and .env as a ZIP archive.</p>
+    <button class="btn btn-normal" :disabled="exporting" @click="exportStack">
       <span v-if="exporting" class="spinner-border spinner-border-sm me-1" />
-      <font-awesome-icon v-else icon="save" class="me-1" />
+      <font-awesome-icon v-else icon="file-archive" class="me-1" />
       {{ exporting ? 'Exporting…' : 'Export as ZIP' }}
     </button>
-    <p v-if="error" class="mt-2 text-danger" style="font-size: 0.85em;">{{ error }}</p>
+    <p v-if="error" class="text-danger mt-2 mb-0" style="font-size:0.85em">{{ error }}</p>
   </div>
 </template>
 
@@ -27,12 +28,9 @@ export default defineComponent({
           for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
           const blob = new Blob([arr], { type: "application/zip" });
           const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url; a.download = res.filename; a.click();
+          const a = document.createElement("a"); a.href = url; a.download = res.filename; a.click();
           URL.revokeObjectURL(url);
-        } else {
-          this.error = res.msg;
-        }
+        } else { this.error = res.msg; }
       });
     },
   },

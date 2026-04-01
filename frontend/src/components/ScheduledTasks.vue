@@ -1,8 +1,7 @@
 <template>
   <div>
-    <h6 class="mb-2"><font-awesome-icon icon="clock" class="me-2" />Scheduled Tasks</h6>
-
-    <table v-if="tasks.length" class="table table-borderless table-sm align-middle mb-2">
+    <h6 class="mb-2">Scheduled Tasks</h6>
+    <table v-if="tasks.length" class="table table-sm table-borderless align-middle mb-2">
       <thead>
         <tr>
           <th>Action</th>
@@ -21,7 +20,7 @@
               <input class="form-check-input" type="checkbox" :checked="t.enabled" @change="toggleTask(t)" />
             </div>
           </td>
-          <td style="font-size: 0.8em; color: var(--bs-secondary-color);">{{ t.last_run ? new Date(t.last_run).toLocaleString() : 'Never' }}</td>
+          <td class="text-muted" style="font-size:0.85em">{{ t.last_run ? new Date(t.last_run).toLocaleString() : 'Never' }}</td>
           <td>
             <button class="btn btn-sm btn-danger py-0" @click="deleteTask(t.id)">
               <font-awesome-icon icon="trash" />
@@ -30,11 +29,11 @@
         </tr>
       </tbody>
     </table>
-    <p v-else style="color: var(--bs-secondary-color); font-size: 0.85em;">No scheduled tasks.</p>
+    <p v-else class="text-muted mb-2" style="font-size:0.85em">No scheduled tasks.</p>
 
-    <div class="d-flex gap-2 align-items-end flex-wrap mt-2">
+    <div class="d-flex gap-2 align-items-end flex-wrap">
       <div>
-        <label class="form-label mb-1" style="font-size: 0.8em;">Action</label>
+        <label class="form-label mb-1" style="font-size:0.85em">Action</label>
         <select v-model="newAction" class="form-select form-select-sm">
           <option value="start">Start</option>
           <option value="stop">Stop</option>
@@ -43,12 +42,12 @@
         </select>
       </div>
       <div>
-        <label class="form-label mb-1" style="font-size: 0.8em;">Cron expression</label>
-        <input v-model="newCron" class="form-control form-control-sm" placeholder="0 3 * * *" style="width: 140px;" />
+        <label class="form-label mb-1" style="font-size:0.85em">Cron expression</label>
+        <input v-model="newCron" class="form-control form-control-sm" placeholder="0 3 * * *" style="width:130px" />
       </div>
-      <button class="btn btn-sm btn-primary" @click="addTask">Add</button>
+      <button class="btn btn-sm btn-normal" @click="addTask">Add Task</button>
     </div>
-    <p v-if="error" class="mt-1 text-danger" style="font-size: 0.85em;">{{ error }}</p>
+    <p v-if="error" class="text-danger mt-1 mb-0" style="font-size:0.85em">{{ error }}</p>
   </div>
 </template>
 
@@ -60,28 +59,15 @@ export default defineComponent({
   data() { return { tasks: [] as any[], newAction: "restart", newCron: "0 3 * * *", error: "" }; },
   mounted() { this.load(); },
   methods: {
-    load() {
-      (this.$root as any)?.getSocket().emit("getScheduledTasks", this.stackName, (res: any) => {
-        if (res.ok) this.tasks = res.tasks;
-      });
-    },
+    load() { (this.$root as any)?.getSocket().emit("getScheduledTasks", this.stackName, (res: any) => { if (res.ok) this.tasks = res.tasks; }); },
     addTask() {
       this.error = "";
       (this.$root as any)?.getSocket().emit("createScheduledTask", { stackName: this.stackName, action: this.newAction, cron: this.newCron }, (res: any) => {
-        if (res.ok) { this.load(); this.newCron = "0 3 * * *"; }
-        else this.error = res.msg;
+        if (res.ok) { this.load(); this.newCron = "0 3 * * *"; } else this.error = res.msg;
       });
     },
-    toggleTask(t: any) {
-      (this.$root as any)?.getSocket().emit("updateScheduledTask", { id: t.id, enabled: !t.enabled }, (res: any) => {
-        if (res.ok) t.enabled = !t.enabled;
-      });
-    },
-    deleteTask(id: number) {
-      (this.$root as any)?.getSocket().emit("deleteScheduledTask", id, (res: any) => {
-        if (res.ok) this.tasks = this.tasks.filter((t) => t.id !== id);
-      });
-    },
+    toggleTask(t: any) { (this.$root as any)?.getSocket().emit("updateScheduledTask", { id: t.id, enabled: !t.enabled }, (res: any) => { if (res.ok) t.enabled = !t.enabled; }); },
+    deleteTask(id: number) { (this.$root as any)?.getSocket().emit("deleteScheduledTask", id, (res: any) => { if (res.ok) this.tasks = this.tasks.filter((t) => t.id !== id); }); },
   },
 });
 </script>

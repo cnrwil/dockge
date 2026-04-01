@@ -1,5 +1,5 @@
 <template>
-  <div class="d-inline-flex flex-wrap gap-1 align-items-center">
+  <div class="d-flex flex-wrap gap-1 align-items-center">
     <span
       v-for="t in tags"
       :key="t.tag"
@@ -11,29 +11,24 @@
         v-if="editable"
         type="button"
         class="btn-close btn-close-white ms-1"
-        style="font-size: 0.5em;"
+        style="font-size:0.55em"
         @click.stop="removeTag(t.tag)"
       />
     </span>
-    <button
-      v-if="editable && !showInput"
-      class="btn btn-sm btn-normal py-0 px-2"
-      style="font-size: 0.75em;"
-      @click.stop="showInput = true"
-    >
-      <font-awesome-icon icon="plus" class="me-1" />Tag
+    <button v-if="editable" class="btn btn-sm btn-normal py-0 px-2" style="font-size:0.8em" @click.stop="showInput = true">
+      <font-awesome-icon icon="plus" /> Tag
     </button>
-    <span v-if="showInput" class="d-inline-flex gap-1">
+    <span v-if="showInput" class="d-inline-flex gap-1 align-items-center">
       <input
         ref="tagInput"
         v-model="newTag"
         class="form-control form-control-sm"
-        style="width: 100px;"
+        style="width:110px"
         placeholder="tag name"
         @keyup.enter="addTag"
         @keyup.esc="showInput = false"
       />
-      <input v-model="newColor" type="color" class="form-control form-control-color form-control-sm" style="width: 38px; padding: 2px;" />
+      <input v-model="newColor" type="color" class="form-control form-control-color form-control-sm" style="width:36px;padding:2px" />
       <button class="btn btn-sm btn-primary" @click="addTag">Add</button>
       <button class="btn btn-sm btn-normal" @click="showInput = false">Cancel</button>
     </span>
@@ -44,21 +39,12 @@
 import { defineComponent, nextTick } from "vue";
 export default defineComponent({
   name: "StackTags",
-  props: {
-    stackName: { type: String, required: true },
-    editable: { type: Boolean, default: false },
-  },
+  props: { stackName: { type: String, required: true }, editable: { type: Boolean, default: false } },
   data() { return { tags: [] as { tag: string; color: string }[], showInput: false, newTag: "", newColor: "#74c2ff" }; },
-  watch: {
-    showInput(v) { if (v) nextTick(() => (this.$refs.tagInput as HTMLInputElement)?.focus()); },
-  },
+  watch: { showInput(v) { if (v) nextTick(() => (this.$refs.tagInput as HTMLInputElement)?.focus()); } },
   mounted() { this.load(); },
   methods: {
-    load() {
-      (this.$root as any)?.getSocket().emit("getStackTags", this.stackName, (res: any) => {
-        if (res.ok) this.tags = res.tags;
-      });
-    },
+    load() { (this.$root as any)?.getSocket().emit("getStackTags", this.stackName, (res: any) => { if (res.ok) this.tags = res.tags; }); },
     addTag() {
       if (!this.newTag.trim()) return;
       const updated = [...this.tags, { tag: this.newTag.trim(), color: this.newColor }];

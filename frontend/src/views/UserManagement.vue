@@ -5,7 +5,7 @@
 
       <div class="mb-3 d-flex justify-content-end">
         <button class="btn btn-primary" @click="showCreateModal = true">
-          <font-awesome-icon icon="plus" class="me-1" /> Add User
+          <font-awesome-icon icon="plus" /> Add User
         </button>
       </div>
 
@@ -43,17 +43,13 @@
                 </span>
               </td>
               <td class="text-end">
-                <button
-                  class="btn btn-sm btn-normal me-1"
-                  :disabled="u.id === currentUserID"
-                  @click="toggleActive(u)"
-                >{{ u.active ? 'Deactivate' : 'Activate' }}</button>
-                <button class="btn btn-sm btn-normal me-1" @click="openResetPassword(u)">Reset PW</button>
-                <button
-                  class="btn btn-sm btn-danger"
-                  :disabled="u.id === currentUserID"
-                  @click="deleteUser(u)"
-                >
+                <button class="btn btn-sm btn-normal me-1" :disabled="u.id === currentUserID" @click="toggleActive(u)">
+                  {{ u.active ? 'Deactivate' : 'Activate' }}
+                </button>
+                <button class="btn btn-sm btn-normal me-1" @click="openResetPassword(u)">
+                  Reset PW
+                </button>
+                <button class="btn btn-sm btn-danger" :disabled="u.id === currentUserID" @click="deleteUser(u)">
                   <font-awesome-icon icon="trash" />
                 </button>
               </td>
@@ -66,45 +62,59 @@
       </div>
 
       <!-- Create User Modal -->
-      <div v-if="showCreateModal" class="modal-overlay" @click.self="showCreateModal = false">
-        <div class="modal-content p-4">
-          <h5 class="mb-3">Create New User</h5>
-          <div class="mb-2">
-            <label class="form-label">Username</label>
-            <input v-model="newUser.username" class="form-control" placeholder="username" />
-          </div>
-          <div class="mb-2">
-            <label class="form-label">Password</label>
-            <input v-model="newUser.password" class="form-control" type="password" />
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Role</label>
-            <select v-model="newUser.role" class="form-select">
-              <option value="viewer">Viewer — read-only</option>
-              <option value="operator">Operator — start/stop/edit stacks</option>
-              <option value="admin">Admin — full access</option>
-            </select>
-          </div>
-          <p v-if="createError" class="text-danger">{{ createError }}</p>
-          <div class="d-flex justify-content-end gap-2">
-            <button class="btn btn-normal" @click="showCreateModal = false">Cancel</button>
-            <button class="btn btn-primary" @click="createUser">Create</button>
+      <div v-if="showCreateModal" class="modal d-block" tabindex="-1" @click.self="showCreateModal = false">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Create New User</h5>
+              <button type="button" class="btn-close" @click="showCreateModal = false" />
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label">Username</label>
+                <input v-model="newUser.username" class="form-control" placeholder="username" />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Password</label>
+                <input v-model="newUser.password" class="form-control" type="password" />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Role</label>
+                <select v-model="newUser.role" class="form-select">
+                  <option value="viewer">Viewer — read-only</option>
+                  <option value="operator">Operator — start/stop/edit stacks</option>
+                  <option value="admin">Admin — full access</option>
+                </select>
+              </div>
+              <p v-if="createError" class="text-danger mb-0">{{ createError }}</p>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-normal" @click="showCreateModal = false">Cancel</button>
+              <button class="btn btn-primary" @click="createUser">Create</button>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Reset Password Modal -->
-      <div v-if="resetTarget" class="modal-overlay" @click.self="resetTarget = null">
-        <div class="modal-content p-4">
-          <h5 class="mb-3">Reset Password for <strong>{{ resetTarget.username }}</strong></h5>
-          <div class="mb-3">
-            <label class="form-label">New Password</label>
-            <input v-model="resetPassword" class="form-control" type="password" />
-          </div>
-          <p v-if="resetError" class="text-danger">{{ resetError }}</p>
-          <div class="d-flex justify-content-end gap-2">
-            <button class="btn btn-normal" @click="resetTarget = null">Cancel</button>
-            <button class="btn btn-primary" @click="submitResetPassword">Reset</button>
+      <div v-if="resetTarget" class="modal d-block" tabindex="-1" @click.self="resetTarget = null">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Reset Password — {{ resetTarget.username }}</h5>
+              <button type="button" class="btn-close" @click="resetTarget = null" />
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label">New Password</label>
+                <input v-model="resetPassword" class="form-control" type="password" />
+              </div>
+              <p v-if="resetError" class="text-danger mb-0">{{ resetError }}</p>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-normal" @click="resetTarget = null">Cancel</button>
+              <button class="btn btn-warning" @click="submitResetPassword">Reset</button>
+            </div>
           </div>
         </div>
       </div>
@@ -157,7 +167,7 @@ export default defineComponent({
     },
     toggleActive(u: UserEntry) {
       (this.$root as any)?.getSocket().emit("admin:updateUser", { id: u.id, active: !u.active }, (res: any) => {
-        if (res.ok) { u.active = !u.active; }
+        if (res.ok) { u.active = !u.active; this.toast.success(`${u.username} ${u.active ? "activated" : "deactivated"}.`); }
         else this.toast.error(res.msg);
       });
     },
@@ -186,25 +196,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-@import "../styles/vars.scss";
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(3px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1050;
-}
-
-.modal-content {
-  width: 100%;
-  max-width: 440px;
-  border-radius: 1rem;
-  box-shadow: 0 15px 70px rgba(0, 0, 0, 0.3);
-}
-</style>
