@@ -40,7 +40,7 @@
                             <font-awesome-icon icon="angle-down" />
                         </div>
 
-                        <!-- Header's Dropdown Menu -->
+                        <!-- Header Dropdown Menu -->
                         <ul class="dropdown-menu">
                             <!-- Username -->
                             <li>
@@ -51,14 +51,6 @@
                             </li>
 
                             <li><hr class="dropdown-divider"></li>
-
-                            <!-- Functions -->
-
-                            <!--<li>
-                                <router-link to="/registry" class="dropdown-item" :class="{ active: $route.path.includes('settings') }">
-                                    <font-awesome-icon icon="warehouse" /> {{ $t("registry") }}
-                                </router-link>
-                            </li>-->
 
                             <li>
                                 <button class="dropdown-item" @click="scanFolder">
@@ -71,6 +63,23 @@
                                     <font-awesome-icon icon="cog" /> {{ $t("Settings") }}
                                 </router-link>
                             </li>
+
+                            <!-- Admin-only links -->
+                            <template v-if="isAdmin">
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <router-link to="/admin/users" class="dropdown-item" :class="{ active: $route.path === '/admin/users' }">
+                                        <font-awesome-icon icon="users" /> User Management
+                                    </router-link>
+                                </li>
+                                <li>
+                                    <router-link to="/admin/audit" class="dropdown-item" :class="{ active: $route.path === '/admin/audit' }">
+                                        <font-awesome-icon icon="clipboard-list" /> Audit Log
+                                    </router-link>
+                                </li>
+                            </template>
+
+                            <li><hr class="dropdown-divider"></li>
 
                             <li>
                                 <button class="dropdown-item" @click="$root.logout">
@@ -107,14 +116,10 @@ export default {
     },
 
     data() {
-        return {
-
-        };
+        return {};
     },
 
     computed: {
-
-        // Theme or Mobile
         classes() {
             const classes = {};
             classes[this.$root.theme] = true;
@@ -130,18 +135,9 @@ export default {
             }
         },
 
-    },
-
-    watch: {
-
-    },
-
-    mounted() {
-
-    },
-
-    beforeUnmount() {
-
+        isAdmin() {
+            return this.$root.userRole === "admin";
+        },
     },
 
     methods: {
@@ -151,7 +147,6 @@ export default {
             });
         },
     },
-
 };
 </script>
 
@@ -220,7 +215,6 @@ main {
     z-index: 99999;
 }
 
-// Profile Pic Button with Dropdown
 .dropdown-profile-pic {
     user-select: none;
 

@@ -5,7 +5,11 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./data:/app/data
+      # Use a named volume so data persists across upgrades and matches
+      # the default path used by the original louislam/dockge install.
+      # If you were previously using louislam/dockge this volume already
+      # exists and your database/settings will be preserved automatically.
+      - dockge_data:/app/data
 
       # If you want to use private registries, you need to share the auth file with Dockge:
       # - /root/.docker/:/root/.docker
@@ -20,6 +24,9 @@ services:
       - DOCKGE_STACKS_DIR=/opt/stacks
     networks:
       - reverseproxy-nw
+
+volumes:
+  dockge_data:
 
 networks:
   reverseproxy-nw:
