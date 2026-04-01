@@ -2,45 +2,46 @@ import jwt from "jsonwebtoken";
 import { R } from "redbean-node";
 import { BeanModel } from "redbean-node/dist/bean-model";
 import { generatePasswordHash, shake256, SHAKE256_LENGTH } from "../password-hash";
+import { UserRole, hasRole } from "../../common/roles";
 
 export class User extends BeanModel {
     /**
-     * Reset user password
-     * Fix #1510, as in the context reset-password.js, there is no auto model mapping. Call this static function instead.
-     * @param {number} userID ID of user to update
-     * @param {string} newPassword Users new password
-     * @returns {Promise<void>}
+     * The user's role: 'admin' | 'operator' | 'viewer'
      */
-    static async resetPassword(userID : number, newPassword : string) {
+    declare role: UserRole;
+
+    /**
+     * Reset user password
+     */
+    static async resetPassword(userID: number, newPassword: string) {
         await R.exec("UPDATE `user` SET password = ? WHERE id = ? ", [
             generatePasswordHash(newPassword),
             userID
         ]);
     }
 
-    /**
-     * Reset this users password
-     * @param {string} newPassword
-     * @returns {Promise<void>}
-     */
-    async resetPassword(newPassword : string) {
+    async resetPassword(newPassword: string) {
         await User.resetPassword(this.id, newPassword);
         this.password = newPassword;
     }
 
     /**
-     * Create a new JWT for a user
-     * @param {User} user The User to create a JsonWebToken for
-     * @param {string} jwtSecret The key used to sign the JsonWebToken
-     * @returns {string} the JsonWebToken as a string
+     * Returns true if this user has at least the given role level.
      */
-    static createJWT(user : User, jwtSecret : string) {
+    hasRole(required: UserRole): boolean {
+        return hasRole(this.role ?? "viewer", required);
+    }
+
+    /**
+     * Create a new JWT for a user
+     */
+    static createJWT(user: User, jwtSecret: string) {
         return jwt.sign({
             username: user.username,
             h: shake256(user.password, SHAKE256_LENGTH),
+            role: user.role ?? "operator",
         }, jwtSecret);
     }
-
 }
 
 export default User;
