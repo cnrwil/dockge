@@ -29,6 +29,8 @@ export default defineComponent({
             loggedIn: false,
             allowLoginDialog: false,
             username: null,
+            // Role of the currently logged-in user: 'admin' | 'operator' | 'viewer'
+            userRole: null as string | null,
             composeTemplate: "",
 
             stackList: {},
@@ -203,8 +205,9 @@ export default defineComponent({
 
             socket.on("disconnect", () => {
                 console.log("disconnect");
-                this.socketIO.connectionErrorMsg = `${this.$t("Lost connection to the socket server. Reconnecting...")}`;
+                this.socketIO.connectionErrorMsg = `${this.$t("Lost connection to the socket server. Reconnecting...")}`,
                 this.socketIO.connected = false;
+                this.userRole = null;
             });
 
             socket.on("connect_error", (err) => {
@@ -220,6 +223,11 @@ export default defineComponent({
 
             socket.on("info", (info) => {
                 this.info = info;
+            });
+
+            // Receive the user's role from the backend after login
+            socket.on("userRole", (role : string) => {
+                this.userRole = role;
             });
 
             socket.on("autoLogin", () => {
@@ -238,7 +246,6 @@ export default defineComponent({
             agentSocket.on("terminalWrite", (terminalName, data) => {
                 const terminal = terminalMap.get(terminalName);
                 if (!terminal) {
-                    //console.error("Terminal not found: " + terminalName);
                     return;
                 }
                 terminal.write(data);
@@ -320,11 +327,6 @@ export default defineComponent({
 
         /**
          * Send request to log user in
-         * @param {string} username Username to log in with
-         * @param {string} password Password to log in with
-         * @param {string} token User token
-         * @param {loginCB} callback Callback to call with result
-         * @returns {void}
          */
         login(username : string, password : string, token : string, callback) {
             this.getSocket().emit("login", {
@@ -354,8 +356,6 @@ export default defineComponent({
 
         /**
          * Log in using a token
-         * @param {string} token Token to log in with
-         * @returns {void}
          */
         loginByToken(token : string) {
             socket.emit("loginByToken", token, (res) => {
@@ -373,7 +373,6 @@ export default defineComponent({
 
         /**
          * Log out of the web application
-         * @returns {void}
          */
         logout() {
             socket.emit("logout", () => { });
@@ -381,12 +380,10 @@ export default defineComponent({
             this.socketIO.token = null;
             this.loggedIn = false;
             this.username = null;
+            this.userRole = null;
             this.clearData();
         },
 
-        /**
-         * @returns {void}
-         */
         clearData() {
 
         },
@@ -396,7 +393,6 @@ export default defineComponent({
         },
 
         bindTerminal(endpoint : string, terminalName : string, terminal : Terminal) {
-            // Load terminal, get terminal screen
             this.emitAgent(endpoint, "terminalJoin", terminalName, (res) => {
                 if (res.ok) {
                     terminal.write(res.buffer);
