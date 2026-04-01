@@ -2,27 +2,26 @@
 
 ###############################################
 # Stage 1 — install deps + build frontend
-# Uses Debian (bookworm) so node-pty prebuilt
-# binaries are available without compiling.
 ###############################################
 FROM node:22-bookworm AS builder
 
 WORKDIR /app
 
-# Copy package files first for layer caching
+# Copy package files
 COPY package.json package-lock.json ./
 
-# npm install (not ci) to avoid lockfile strictness issues
+# Install all dependencies (devDeps needed for vite)
 RUN npm install
 
-# Copy source needed for the frontend build
-COPY frontend ./frontend
+# Copy everything needed for the frontend build
 COPY tsconfig.json ./tsconfig.json
+COPY frontend     ./frontend
+COPY common       ./common
 
-# Build the Vue frontend
+# Build the Vue frontend — outputs to /app/frontend-dist
 RUN npm run build:frontend
 
-# Remove devDependencies
+# Remove devDependencies for the runtime image
 RUN npm prune --omit=dev
 
 ###############################################
@@ -36,16 +35,12 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# Copy pruned node_modules from builder
-COPY --from=builder /app/node_modules ./node_modules
-
-# Copy built frontend
+COPY --from=builder /app/node_modules  ./node_modules
 COPY --from=builder /app/frontend-dist ./frontend-dist
 
-# Copy backend source
-COPY backend ./backend
-COPY common  ./common
-COPY extra   ./extra
+COPY backend     ./backend
+COPY common      ./common
+COPY extra       ./extra
 COPY package.json ./package.json
 
 RUN mkdir -p ./data
