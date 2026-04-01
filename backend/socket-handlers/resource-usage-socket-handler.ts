@@ -6,16 +6,16 @@ import childProcessAsync from "promisify-child-process";
 function parseDockerStats(raw: string) {
     const results: any[] = [];
     for (const line of raw.split("\n")) {
-        const trimmed = line.trim(); if (!trimmed) continue;
+        const t = line.trim(); if (!t) continue;
         try {
-            const obj = JSON.parse(trimmed);
+            const obj = JSON.parse(t);
             const parseMB = (s: string) => { if (!s) return 0; const n = parseFloat(s); if (s.includes("GiB")) return n * 1024; if (s.includes("MiB")) return n; if (s.includes("kB") || s.includes("KiB")) return n / 1024; return n; };
             const parsePct = (s: string) => parseFloat(s?.replace("%", "") ?? "0") || 0;
             const [memUsed, memLimit] = (obj.MemUsage ?? "").split(" / ");
             const [netRx, netTx] = (obj.NetIO ?? "").split(" / ");
             const [blkR, blkW] = (obj.BlockIO ?? "").split(" / ");
             results.push({ name: obj.Name ?? "", cpuPct: parsePct(obj.CPUPerc), memUsageMB: parseMB(memUsed), memLimitMB: parseMB(memLimit), memPct: parsePct(obj.MemPerc), netRxMB: parseMB(netRx), netTxMB: parseMB(netTx), blockReadMB: parseMB(blkR), blockWriteMB: parseMB(blkW) });
-        } catch { }
+        } catch { /* skip */ }
     }
     return results;
 }
@@ -25,6 +25,7 @@ export class ResourceUsageSocketHandler extends SocketHandler {
         socket.on("getStackResourceUsage", async (stackName: string, callback) => {
             try {
                 checkLogin(socket);
+                if (typeof stackName !== "string") throw new Error("Invalid stack name.");
                 const res = await childProcessAsync.spawn("docker", ["stats", "--no-stream", "--format", "{{json .}}"], { encoding: "utf-8" });
                 const allStats = parseDockerStats(res.stdout?.toString() ?? "");
                 const containers = allStats.filter((c) => c.name.startsWith(stackName + "-"));

@@ -12,19 +12,21 @@ export class StackBackupSocketHandler extends SocketHandler {
         socket.on("exportStack", async (stackName: string, callback) => {
             try {
                 checkLogin(socket);
-                if (typeof stackName !== "string" || stackName.trim() === "") throw new Error("Invalid stack name.");
+                if (typeof stackName !== "string" || !stackName.trim()) throw new Error("Invalid stack name.");
                 const stack = await Stack.getStack(server, stackName);
+                const stackPath = stack.path;
                 const archive = archiver("zip", { zlib: { level: 9 } });
                 const passThrough = new PassThrough();
                 const chunks: Buffer[] = [];
                 passThrough.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
                 const zipReady = new Promise<void>((resolve, reject) => { passThrough.on("end", resolve); passThrough.on("error", reject); archive.on("error", reject); });
                 archive.pipe(passThrough);
-                const composeFile = path.join(stack.path, "compose.yaml");
+                const composeFile = path.join(stackPath, "compose.yaml");
                 if (fs.existsSync(composeFile)) archive.file(composeFile, { name: "compose.yaml" });
-                const envFile = path.join(stack.path, ".env");
+                const envFile = path.join(stackPath, ".env");
                 if (fs.existsSync(envFile)) archive.file(envFile, { name: ".env" });
-                await archive.finalize(); await zipReady;
+                await archive.finalize();
+                await zipReady;
                 callback({ ok: true, filename: `${stackName}-backup.zip`, data: Buffer.concat(chunks).toString("base64") });
             } catch (e) { callbackError(e, callback); }
         });

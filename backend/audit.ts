@@ -27,7 +27,12 @@ export async function audit(opts: AuditOptions): Promise<void> {
     }
 }
 
-export async function auditSocket(socket: DockgeSocket, action: string, target?: string, detail?: Record<string, unknown>): Promise<void> {
+export async function auditSocket(
+    socket: DockgeSocket,
+    action: string,
+    target?: string,
+    detail?: Record<string, unknown>
+): Promise<void> {
     await audit({
         userID: socket.userID ?? null,
         username: (socket as any).username ?? "unknown",

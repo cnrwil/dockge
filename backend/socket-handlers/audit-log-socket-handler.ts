@@ -12,7 +12,8 @@ export class AuditLogSocketHandler extends SocketHandler {
                 checkRole(socket, "admin");
                 const page = Math.max(1, opts?.page ?? 1);
                 const offset = (page - 1) * PAGE_SIZE;
-                let query = R.knex("audit_log"); let countQuery = R.knex("audit_log");
+                let query = R.knex("audit_log");
+                let countQuery = R.knex("audit_log");
                 if (opts?.action) { query = query.where("action", "like", `${opts.action}%`); countQuery = countQuery.where("action", "like", `${opts.action}%`); }
                 if (opts?.username) { query = query.where("username", "like", `%${opts.username}%`); countQuery = countQuery.where("username", "like", `%${opts.username}%`); }
                 const [{ count }] = await countQuery.count("id as count");
@@ -24,7 +25,8 @@ export class AuditLogSocketHandler extends SocketHandler {
             try {
                 checkRole(socket, "admin");
                 if (typeof days !== "number" || days < 1) throw new Error("Invalid retention period.");
-                const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
+                const cutoff = new Date();
+                cutoff.setDate(cutoff.getDate() - days);
                 const deleted = await R.knex("audit_log").where("created_at", "<", cutoff).delete();
                 callback({ ok: true, msg: `Deleted ${deleted} entries older than ${days} days.` });
             } catch (e) { callbackError(e, callback); }
