@@ -36,7 +36,6 @@ import { AgentProxySocketHandler } from "./socket-handlers/agent-proxy-socket-ha
 import { AgentSocketHandler } from "./agent-socket-handler";
 import { AgentSocket } from "../common/agent-socket";
 import { ManageAgentSocketHandler } from "./socket-handlers/manage-agent-socket-handler";
-// Feature handlers
 import { UserManagementSocketHandler } from "./socket-handlers/user-management-socket-handler";
 import { AuditLogSocketHandler } from "./socket-handlers/audit-log-socket-handler";
 import { StackTagsSocketHandler } from "./socket-handlers/stack-tags-socket-handler";
@@ -65,7 +64,6 @@ export class DockgeServer {
     socketHandlerList : SocketHandler[] = [
         new MainSocketHandler(),
         new ManageAgentSocketHandler(),
-        // Feature handlers
         new UserManagementSocketHandler(),
         new AuditLogSocketHandler(),
         new StackTagsSocketHandler(),
@@ -96,10 +94,18 @@ export class DockgeServer {
         process.addListener("unhandledRejection", unexpectedErrorHandler);
         process.addListener("uncaughtException", unexpectedErrorHandler);
 
-        if (!process.env.NODE_ENV) process.env.NODE_ENV = "production";
+        if (!process.env.NODE_ENV) {
+            process.env.NODE_ENV = "production";
+        }
+
         log.info("server", "NODE_ENV: " + process.env.NODE_ENV);
 
-        let defaultStacksDir = process.platform === "win32" ? "./stacks" : "/opt/stacks";
+        let defaultStacksDir;
+        if (process.platform === "win32") {
+            defaultStacksDir = "./stacks";
+        } else {
+            defaultStacksDir = "/opt/stacks";
+        }
 
         let args = parse<Arguments>({
             sslKey: { type: String, optional: true },
@@ -149,7 +155,9 @@ export class DockgeServer {
             this.httpServer = http.createServer(this.app);
         }
 
-        for (const router of this.routerList) this.app.use(router.create(this.app, this));
+        for (const router of this.routerList) {
+            this.app.use(router.create(this.app, this));
+        }
 
         this.app.use("/", expressStaticGzip("frontend-dist", { enableBrotli: true }));
         this.app.get("*", async (_request, response) => { response.send(this.indexHTML); });
@@ -214,10 +222,16 @@ export class DockgeServer {
                 dockgeSocket.emit("setup");
             }
 
-            for (const socketHandler of this.socketHandlerList) socketHandler.create(dockgeSocket, this);
+            for (const socketHandler of this.socketHandlerList) {
+                socketHandler.create(dockgeSocket, this);
+            }
 
             let agentSocket = new AgentSocket();
-            for (const socketHandler of this.agentSocketHandlerList) socketHandler.create(dockgeSocket, this, agentSocket);
+
+            for (const socketHandler of this.agentSocketHandlerList) {
+                socketHandler.create(dockgeSocket, this, agentSocket);
+            }
+
             this.agentProxySocketHandler.create2(dockgeSocket, this, agentSocket);
 
             log.debug("auth", "check auto login");
@@ -246,13 +260,14 @@ export class DockgeServer {
 
     async afterLogin(socket : DockgeSocket, user : User) {
         socket.userID = user.id;
-        // Set role and username on socket for role checks and audit logging
+        // Set role for checkRole() guards
         socket.userRole = (user.role ?? "operator") as UserRole;
+        // Expose username for audit logging
         (socket as any).username = user.username;
 
         socket.join(user.id.toString());
 
-        // Inform the frontend of the session role
+        // Tell the frontend the role so it can show/hide admin features
         socket.emit("userRole", socket.userRole);
 
         this.sendInfo(socket);
@@ -273,7 +288,9 @@ export class DockgeServer {
         try {
             await Database.init(this);
         } catch (e) {
-            if (e instanceof Error) log.error("server", "Failed to prepare your database: " + e.message);
+            if (e instanceof Error) {
+                log.error("server", "Failed to prepare your database: " + e.message);
+            }
             process.exit(1);
         }
 
@@ -308,7 +325,7 @@ export class DockgeServer {
             checkVersion.startInterval();
         });
 
-        // Start the scheduled task runner after DB is ready
+        // Start cron-based scheduled tasks
         await startScheduler(this);
 
         gracefulShutdown(this.httpServer, {
@@ -322,7 +339,9 @@ export class DockgeServer {
     }
 
     async sendInfo(socket : Socket, hideVersion = false) {
-        let versionProperty, latestVersionProperty, isContainer;
+        let versionProperty;
+        let latestVersionProperty;
+        let isContainer;
         if (!hideVersion) {
             versionProperty = packageJSON.version;
             latestVersionProperty = checkVersion.latestVersion;
@@ -337,20 +356,31 @@ export class DockgeServer {
     }
 
     async getClientIP(socket : Socket) : Promise<string> {
-        let clientIP = socket.client.conn.remoteAddress ?? "";
+        let clientIP = socket.client.conn.remoteAddress;
+        if (clientIP === undefined) clientIP = "";
         if (await Settings.get("trustProxy")) {
             const forwardedFor = socket.client.conn.request.headers["x-forwarded-for"];
-            if (typeof forwardedFor === "string") return forwardedFor.split(",")[0].trim();
-            if (typeof socket.client.conn.request.headers["x-real-ip"] === "string") return socket.client.conn.request.headers["x-real-ip"];
+            if (typeof forwardedFor === "string") {
+                return forwardedFor.split(",")[0].trim();
+            } else if (typeof socket.client.conn.request.headers["x-real-ip"] === "string") {
+                return socket.client.conn.request.headers["x-real-ip"];
+            }
         }
         return clientIP.replace(/^::ffff:/, "");
     }
 
     async getTimezone() {
-        try { if (process.env.TZ) { this.checkTimezone(process.env.TZ); return process.env.TZ; } } catch (e) { if (e instanceof Error) log.warn("timezone", e.message + " in process.env.TZ"); }
+        try {
+            if (process.env.TZ) { this.checkTimezone(process.env.TZ); return process.env.TZ; }
+        } catch (e) { if (e instanceof Error) log.warn("timezone", e.message + " in process.env.TZ"); }
         const timezone = await Settings.get("serverTimezone");
-        try { if (timezone) { this.checkTimezone(timezone); return timezone; } } catch (e) { if (e instanceof Error) log.warn("timezone", e.message + " in settings"); }
-        try { const guess = dayjs.tz.guess(); if (guess) { this.checkTimezone(guess); return guess; } return "UTC"; } catch (e) { return "UTC"; }
+        try {
+            if (timezone) { this.checkTimezone(timezone); return timezone; }
+        } catch (e) { if (e instanceof Error) log.warn("timezone", e.message + " in settings"); }
+        try {
+            const guess = dayjs.tz.guess();
+            if (guess) { this.checkTimezone(guess); return guess; } else return "UTC";
+        } catch (e) { return "UTC"; }
     }
 
     getTimezoneOffset() { return dayjs().format("Z"); }

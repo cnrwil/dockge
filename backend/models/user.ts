@@ -5,19 +5,10 @@ import { generatePasswordHash, shake256, SHAKE256_LENGTH } from "../password-has
 import { UserRole, hasRole } from "../../common/roles";
 
 export class User extends BeanModel {
-    /**
-     * The user's role: 'admin' | 'operator' | 'viewer'
-     */
     declare role: UserRole;
 
-    /**
-     * Reset user password
-     */
     static async resetPassword(userID: number, newPassword: string) {
-        await R.exec("UPDATE `user` SET password = ? WHERE id = ? ", [
-            generatePasswordHash(newPassword),
-            userID
-        ]);
+        await R.exec("UPDATE `user` SET password = ? WHERE id = ? ", [generatePasswordHash(newPassword), userID]);
     }
 
     async resetPassword(newPassword: string) {
@@ -25,16 +16,10 @@ export class User extends BeanModel {
         this.password = newPassword;
     }
 
-    /**
-     * Returns true if this user has at least the given role level.
-     */
     hasRole(required: UserRole): boolean {
         return hasRole(this.role ?? "viewer", required);
     }
 
-    /**
-     * Create a new JWT for a user
-     */
     static createJWT(user: User, jwtSecret: string) {
         return jwt.sign({
             username: user.username,
