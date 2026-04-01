@@ -1,17 +1,16 @@
 <template>
   <transition name="slide-fade" appear>
     <div>
-      <h1 class="mb-4">{{ $t("User Management") }}</h1>
+      <h1 class="mb-4">User Management</h1>
 
       <div class="mb-3 d-flex justify-content-end">
         <button class="btn btn-primary" @click="showCreateModal = true">
-          <font-awesome-icon icon="plus" /> Add User
+          <font-awesome-icon icon="plus" class="me-1" /> Add User
         </button>
       </div>
 
-      <!-- User Table -->
-      <div class="table-responsive">
-        <table class="table table-borderless table-hover align-middle">
+      <div class="shadow-box big-padding">
+        <table class="table table-borderless table-hover align-middle mb-0">
           <thead>
             <tr>
               <th>Username</th>
@@ -22,7 +21,10 @@
           </thead>
           <tbody>
             <tr v-for="u in users" :key="u.id">
-              <td>{{ u.username }} <span v-if="u.id === currentUserID" class="badge bg-secondary ms-1">You</span></td>
+              <td>
+                {{ u.username }}
+                <span v-if="u.id === currentUserID" class="badge bg-secondary ms-1">You</span>
+              </td>
               <td>
                 <select
                   class="form-select form-select-sm w-auto"
@@ -36,25 +38,24 @@
                 </select>
               </td>
               <td>
-                <span :class="u.active ? 'badge bg-success' : 'badge bg-secondary'">
+                <span :class="u.active ? 'badge bg-primary' : 'badge bg-secondary'">
                   {{ u.active ? 'Active' : 'Inactive' }}
                 </span>
               </td>
               <td class="text-end">
                 <button
-                  class="btn btn-sm btn-outline-warning me-1"
+                  class="btn btn-sm btn-normal me-1"
                   :disabled="u.id === currentUserID"
                   @click="toggleActive(u)"
                 >{{ u.active ? 'Deactivate' : 'Activate' }}</button>
+                <button class="btn btn-sm btn-normal me-1" @click="openResetPassword(u)">Reset PW</button>
                 <button
-                  class="btn btn-sm btn-outline-info me-1"
-                  @click="openResetPassword(u)"
-                >Reset PW</button>
-                <button
-                  class="btn btn-sm btn-outline-danger"
+                  class="btn btn-sm btn-danger"
                   :disabled="u.id === currentUserID"
                   @click="deleteUser(u)"
-                >Delete</button>
+                >
+                  <font-awesome-icon icon="trash" />
+                </button>
               </td>
             </tr>
             <tr v-if="users.length === 0">
@@ -65,8 +66,8 @@
       </div>
 
       <!-- Create User Modal -->
-      <div v-if="showCreateModal" class="modal-backdrop-custom" @click.self="showCreateModal = false">
-        <div class="modal-box">
+      <div v-if="showCreateModal" class="modal-overlay" @click.self="showCreateModal = false">
+        <div class="modal-content p-4">
           <h5 class="mb-3">Create New User</h5>
           <div class="mb-2">
             <label class="form-label">Username</label>
@@ -74,7 +75,7 @@
           </div>
           <div class="mb-2">
             <label class="form-label">Password</label>
-            <input v-model="newUser.password" class="form-control" type="password" placeholder="password" />
+            <input v-model="newUser.password" class="form-control" type="password" />
           </div>
           <div class="mb-3">
             <label class="form-label">Role</label>
@@ -84,27 +85,27 @@
               <option value="admin">Admin — full access</option>
             </select>
           </div>
+          <p v-if="createError" class="text-danger">{{ createError }}</p>
           <div class="d-flex justify-content-end gap-2">
-            <button class="btn btn-secondary" @click="showCreateModal = false">Cancel</button>
+            <button class="btn btn-normal" @click="showCreateModal = false">Cancel</button>
             <button class="btn btn-primary" @click="createUser">Create</button>
           </div>
-          <p v-if="createError" class="text-danger mt-2">{{ createError }}</p>
         </div>
       </div>
 
       <!-- Reset Password Modal -->
-      <div v-if="resetTarget" class="modal-backdrop-custom" @click.self="resetTarget = null">
-        <div class="modal-box">
-          <h5 class="mb-3">Reset Password for {{ resetTarget.username }}</h5>
+      <div v-if="resetTarget" class="modal-overlay" @click.self="resetTarget = null">
+        <div class="modal-content p-4">
+          <h5 class="mb-3">Reset Password for <strong>{{ resetTarget.username }}</strong></h5>
           <div class="mb-3">
             <label class="form-label">New Password</label>
-            <input v-model="resetPassword" class="form-control" type="password" placeholder="new password" />
+            <input v-model="resetPassword" class="form-control" type="password" />
           </div>
+          <p v-if="resetError" class="text-danger">{{ resetError }}</p>
           <div class="d-flex justify-content-end gap-2">
-            <button class="btn btn-secondary" @click="resetTarget = null">Cancel</button>
-            <button class="btn btn-warning" @click="submitResetPassword">Reset</button>
+            <button class="btn btn-normal" @click="resetTarget = null">Cancel</button>
+            <button class="btn btn-primary" @click="submitResetPassword">Reset</button>
           </div>
-          <p v-if="resetError" class="text-danger mt-2">{{ resetError }}</p>
         </div>
       </div>
 
@@ -125,9 +126,7 @@ interface UserEntry {
 
 export default defineComponent({
   name: "UserManagement",
-  setup() {
-    return { toast: useToast() };
-  },
+  setup() { return { toast: useToast() }; },
   data() {
     return {
       users: [] as UserEntry[],
@@ -140,106 +139,72 @@ export default defineComponent({
     };
   },
   computed: {
-    currentUserID(): number {
-      return this.$root?.userID ?? -1;
-    },
+    currentUserID(): number { return (this.$root as any)?.userID ?? -1; },
   },
-  mounted() {
-    this.loadUsers();
-  },
+  mounted() { this.loadUsers(); },
   methods: {
     loadUsers() {
-      this.$root?.getSocket().emit("admin:getUsers", (res: any) => {
-        if (res.ok) {
-          this.users = res.users;
-        } else {
-          this.toast.error(res.msg ?? "Failed to load users.");
-        }
+      (this.$root as any)?.getSocket().emit("admin:getUsers", (res: any) => {
+        if (res.ok) this.users = res.users;
+        else this.toast.error(res.msg ?? "Failed to load users.");
       });
     },
     updateRole(u: UserEntry, role: string) {
-      this.$root?.getSocket().emit("admin:updateUser", { id: u.id, role }, (res: any) => {
-        if (res.ok) {
-          u.role = role;
-          this.toast.success(`Role updated for ${u.username}.`);
-        } else {
-          this.toast.error(res.msg);
-        }
+      (this.$root as any)?.getSocket().emit("admin:updateUser", { id: u.id, role }, (res: any) => {
+        if (res.ok) { u.role = role; this.toast.success(`Role updated for ${u.username}.`); }
+        else this.toast.error(res.msg);
       });
     },
     toggleActive(u: UserEntry) {
-      this.$root?.getSocket().emit("admin:updateUser", { id: u.id, active: !u.active }, (res: any) => {
-        if (res.ok) {
-          u.active = !u.active;
-          this.toast.success(`User ${u.username} ${u.active ? "activated" : "deactivated"}.`);
-        } else {
-          this.toast.error(res.msg);
-        }
+      (this.$root as any)?.getSocket().emit("admin:updateUser", { id: u.id, active: !u.active }, (res: any) => {
+        if (res.ok) { u.active = !u.active; }
+        else this.toast.error(res.msg);
       });
     },
     createUser() {
       this.createError = "";
-      this.$root?.getSocket().emit("admin:createUser", this.newUser, (res: any) => {
-        if (res.ok) {
-          this.showCreateModal = false;
-          this.newUser = { username: "", password: "", role: "operator" };
-          this.toast.success(res.msg);
-          this.loadUsers();
-        } else {
-          this.createError = res.msg;
-        }
+      (this.$root as any)?.getSocket().emit("admin:createUser", this.newUser, (res: any) => {
+        if (res.ok) { this.showCreateModal = false; this.newUser = { username: "", password: "", role: "operator" }; this.toast.success(res.msg); this.loadUsers(); }
+        else this.createError = res.msg;
       });
     },
     deleteUser(u: UserEntry) {
       if (!confirm(`Delete user "${u.username}"? This cannot be undone.`)) return;
-      this.$root?.getSocket().emit("admin:deleteUser", u.id, (res: any) => {
-        if (res.ok) {
-          this.toast.success(res.msg);
-          this.loadUsers();
-        } else {
-          this.toast.error(res.msg);
-        }
+      (this.$root as any)?.getSocket().emit("admin:deleteUser", u.id, (res: any) => {
+        if (res.ok) { this.toast.success(res.msg); this.loadUsers(); }
+        else this.toast.error(res.msg);
       });
     },
-    openResetPassword(u: UserEntry) {
-      this.resetTarget = u;
-      this.resetPassword = "";
-      this.resetError = "";
-    },
+    openResetPassword(u: UserEntry) { this.resetTarget = u; this.resetPassword = ""; this.resetError = ""; },
     submitResetPassword() {
       this.resetError = "";
-      this.$root?.getSocket().emit("admin:resetUserPassword",
-        { id: this.resetTarget!.id, newPassword: this.resetPassword },
-        (res: any) => {
-          if (res.ok) {
-            this.toast.success(res.msg);
-            this.resetTarget = null;
-          } else {
-            this.resetError = res.msg;
-          }
-        }
-      );
+      (this.$root as any)?.getSocket().emit("admin:resetUserPassword", { id: this.resetTarget!.id, newPassword: this.resetPassword }, (res: any) => {
+        if (res.ok) { this.toast.success(res.msg); this.resetTarget = null; }
+        else this.resetError = res.msg;
+      });
     },
   },
 });
 </script>
 
-<style scoped>
-.modal-backdrop-custom {
+<style lang="scss" scoped>
+@import "../styles/vars.scss";
+
+.modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1050;
 }
-.modal-box {
-  background: var(--bs-body-bg);
-  border-radius: 12px;
-  padding: 2rem;
+
+.modal-content {
   width: 100%;
   max-width: 440px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+  border-radius: 1rem;
+  box-shadow: 0 15px 70px rgba(0, 0, 0, 0.3);
 }
 </style>
