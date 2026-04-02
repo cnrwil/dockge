@@ -1,25 +1,32 @@
 <template>
   <div>
-    <div v-if="loading" class="text-center py-2"><div class="spinner-border spinner-border-sm" /></div>
-    <div v-else-if="stats">
+    <div v-if="loading" class="text-center py-2">
+      <div class="spinner-border spinner-border-sm" />
+    </div>
+    <div v-else-if="stats && stats.containers.length > 0">
+      <!-- Summary pills -->
       <div class="d-flex gap-4 mb-3">
         <div>
-          <div class="text-muted mb-1" style="font-size:0.75em;text-transform:uppercase">CPU</div>
-          <div style="font-size:1.1em;font-weight:600">{{ stats.totalCpuPct.toFixed(1) }}%</div>
-          <div class="progress mt-1" style="height:4px;width:80px">
-            <div class="progress-bar" :style="{ width: Math.min(stats.totalCpuPct, 100) + '%' }" />
-          </div>
+          <div class="stat-label">CPU</div>
+          <div class="stat-value">{{ stats.totalCpuPct.toFixed(1) }}%</div>
+          <div class="mini-bar"><div class="mini-bar-fill cpu" :style="{ width: Math.min(stats.totalCpuPct, 100) + '%' }" /></div>
         </div>
         <div>
-          <div class="text-muted mb-1" style="font-size:0.75em;text-transform:uppercase">Memory</div>
-          <div style="font-size:1.1em;font-weight:600">{{ formatMB(stats.totalMemUsageMB) }}</div>
-          <div class="progress mt-1" style="height:4px;width:80px">
-            <div class="progress-bar bg-success" :style="{ width: Math.min(memPct, 100) + '%' }" />
-          </div>
+          <div class="stat-label">Memory</div>
+          <div class="stat-value">{{ formatMB(stats.totalMemUsageMB) }}</div>
+          <div class="mini-bar"><div class="mini-bar-fill mem" :style="{ width: Math.min(memPct, 100) + '%' }" /></div>
         </div>
       </div>
-      <table class="table table-sm table-borderless mb-0" style="font-size:0.82em">
-        <thead><tr class="text-muted"><th>Container</th><th>CPU</th><th>Memory</th><th>Net I/O</th></tr></thead>
+      <!-- Per-container breakdown -->
+      <table class="table table-borderless table-sm mb-0">
+        <thead>
+          <tr class="table-header">
+            <th>Container</th>
+            <th>CPU</th>
+            <th>Memory</th>
+            <th>Net I/O</th>
+          </tr>
+        </thead>
         <tbody>
           <tr v-for="c in stats.containers" :key="c.name">
             <td>{{ c.name }}</td>
@@ -29,12 +36,15 @@
           </tr>
         </tbody>
       </table>
-      <div class="text-end mt-1">
-        <small class="text-muted">Updated {{ updatedAt }}</small>
-        <button class="btn btn-sm btn-normal ms-2 py-0" @click="load">Refresh</button>
+      <div class="d-flex justify-content-end align-items-center mt-1">
+        <small class="last-updated me-2">Updated {{ updatedAt }}</small>
+        <button class="btn btn-sm btn-normal py-0" @click="load">Refresh</button>
       </div>
     </div>
-    <p v-else class="text-muted mb-0" style="font-size:0.85em">No containers running.</p>
+    <div v-else-if="stats && stats.containers.length === 0" class="no-data">
+      No containers running for this stack.
+    </div>
+    <p v-else class="no-data">Failed to load stats.</p>
   </div>
 </template>
 
@@ -60,7 +70,63 @@ export default defineComponent({
         if (res.ok) { this.stats = res.stats; this.updatedAt = new Date().toLocaleTimeString(); }
       });
     },
-    formatMB(mb: number): string { return mb >= 1024 ? (mb / 1024).toFixed(1) + " GB" : mb.toFixed(0) + " MB"; },
+    formatMB(mb: number): string {
+      if (!mb) return "0 MB";
+      return mb >= 1024 ? (mb / 1024).toFixed(1) + " GB" : mb.toFixed(0) + " MB";
+    },
   },
 });
 </script>
+
+<style lang="scss" scoped>
+@import "../styles/vars.scss";
+
+.stat-label {
+  font-size: 0.7em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: $dark-font-color3;
+}
+
+.stat-value {
+  font-size: 1.1em;
+  font-weight: 600;
+}
+
+.mini-bar {
+  height: 4px;
+  width: 80px;
+  border-radius: 2px;
+  background: $dark-border-color;
+  overflow: hidden;
+  margin-top: 3px;
+}
+
+.mini-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease;
+  &.cpu { background: $primary; }
+  &.mem { background: #86e6a9; }
+}
+
+.table-header th {
+  color: $dark-font-color3;
+  font-size: 0.82em;
+}
+
+.last-updated {
+  font-size: 0.78em;
+  color: $dark-font-color3;
+}
+
+.no-data {
+  font-size: 0.85em;
+  color: $dark-font-color3;
+  margin: 0;
+}
+
+table {
+  font-size: 0.82em;
+}
+</style>

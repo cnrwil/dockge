@@ -5,7 +5,7 @@
 
       <div class="mb-3 d-flex justify-content-end">
         <button class="btn btn-primary" @click="showCreateModal = true">
-          <font-awesome-icon icon="plus" /> Add User
+          <font-awesome-icon icon="plus" class="me-1" /> Add User
         </button>
       </div>
 
@@ -46,22 +46,20 @@
                 <button class="btn btn-sm btn-normal me-1" :disabled="u.id === currentUserID" @click="toggleActive(u)">
                   {{ u.active ? 'Deactivate' : 'Activate' }}
                 </button>
-                <button class="btn btn-sm btn-normal me-1" @click="openResetPassword(u)">
-                  Reset PW
-                </button>
+                <button class="btn btn-sm btn-normal me-1" @click="openResetPassword(u)">Reset PW</button>
                 <button class="btn btn-sm btn-danger" :disabled="u.id === currentUserID" @click="deleteUser(u)">
                   <font-awesome-icon icon="trash" />
                 </button>
               </td>
             </tr>
             <tr v-if="users.length === 0">
-              <td colspan="4" class="text-center text-muted">No users found.</td>
+              <td colspan="4" class="text-center secondary-text">No users found.</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <!-- Create User Modal -->
+      <!-- Create User Modal using Bootstrap modal classes (matches existing site) -->
       <div v-if="showCreateModal" class="modal d-block" tabindex="-1" @click.self="showCreateModal = false">
         <div class="modal-dialog modal-dialog-centered">
           <div class="modal-content">
@@ -113,7 +111,7 @@
             </div>
             <div class="modal-footer">
               <button class="btn btn-normal" @click="resetTarget = null">Cancel</button>
-              <button class="btn btn-warning" @click="submitResetPassword">Reset</button>
+              <button class="btn btn-primary" @click="submitResetPassword">Reset</button>
             </div>
           </div>
         </div>
@@ -196,3 +194,17 @@ export default defineComponent({
   },
 });
 </script>
+
+<style lang="scss" scoped>
+@import "../styles/vars.scss";
+
+.secondary-text {
+  color: $dark-font-color3;
+}
+
+// Ensure modal backdrop blur matches the rest of the site
+.modal {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+}
+</style>
