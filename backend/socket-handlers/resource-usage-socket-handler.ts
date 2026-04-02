@@ -1,37 +1,57 @@
 import { SocketHandler } from "../socket-handler.js";
 import { DockgeServer } from "../dockge-server";
 import { checkLogin, callbackError, DockgeSocket } from "../util-server";
+import { Stack } from "../stack";
 import childProcessAsync from "promisify-child-process";
+import path from "path";
 
-function parseDockerStats(raw: string) {
-    const results: any[] = [];
-    for (const line of raw.split("\n")) {
+interface ContainerStats {
+    name: string;
+    cpuPct: number;
+    memUsageMB: number;
+    memLimitMB: number;
+    memPct: number;
+    netRxMB: number;
+    netTxMB: number;
+}
+
+const parseMB = (s: string): number => {
+    if (!s || s === "0B" || s === "--") return 0;
+    const n = parseFloat(s);
+    if (isNaN(n)) return 0;
+    if (s.includes("GiB") || s.includes("GB")) return n * 1024;
+    if (s.includes("MiB") || s.includes("MB")) return n;
+    if (s.includes("KiB") || s.includes("kB") || s.includes("KB")) return n / 1024;
+    return n;
+};
+
+const parsePct = (s: string): number =>
+    parseFloat((s ?? "0").replace("%", "")) || 0;
+
+/**
+ * Get stats for a specific list of container names using `docker stats`.
+ */
+async function getStatsForContainers(containerNames: string[]): Promise<ContainerStats[]> {
+    if (containerNames.length === 0) return [];
+
+    const res = await childProcessAsync.spawn(
+        "docker",
+        [
+            "stats", "--no-stream",
+            "--format", "{\"Name\":\"{{.Name}}\",\"CPUPerc\":\"{{.CPUPerc}}\",\"MemUsage\":\"{{.MemUsage}}\",\"MemPerc\":\"{{.MemPerc}}\",\"NetIO\":\"{{.NetIO}}\"}",
+            ...containerNames,
+        ],
+        { encoding: "utf-8" }
+    );
+
+    const results: ContainerStats[] = [];
+    for (const line of (res.stdout?.toString() ?? "").split("\n")) {
         const t = line.trim();
         if (!t) continue;
         try {
             const obj = JSON.parse(t);
-
-            // Parse values like "1.23GiB", "456MiB", "789kB" into MB
-            const parseMB = (s: string): number => {
-                if (!s || s === "0B") return 0;
-                const n = parseFloat(s);
-                if (isNaN(n)) return 0;
-                if (s.includes("GiB") || s.includes("GB")) return n * 1024;
-                if (s.includes("MiB") || s.includes("MB")) return n;
-                if (s.includes("KiB") || s.includes("kB") || s.includes("KB")) return n / 1024;
-                return n;
-            };
-
-            const parsePct = (s: string): number =>
-                parseFloat((s ?? "0").replace("%", "")) || 0;
-
-            // MemUsage format: "123MiB / 1GiB"
             const memParts = (obj.MemUsage ?? "").split(" / ");
-            // NetIO format: "1kB / 2kB"
             const netParts = (obj.NetIO ?? "").split(" / ");
-            // BlockIO format: "0B / 0B"
-            const blkParts = (obj.BlockIO ?? "").split(" / ");
-
             results.push({
                 name: obj.Name ?? "",
                 cpuPct: parsePct(obj.CPUPerc),
@@ -40,12 +60,41 @@ function parseDockerStats(raw: string) {
                 memPct: parsePct(obj.MemPerc),
                 netRxMB: parseMB(netParts[0]),
                 netTxMB: parseMB(netParts[1]),
-                blockReadMB: parseMB(blkParts[0]),
-                blockWriteMB: parseMB(blkParts[1]),
             });
-        } catch { /* skip malformed lines */ }
+        } catch { /* skip */ }
     }
     return results;
+}
+
+/**
+ * Use `docker compose ps --format json` inside the stack directory to get
+ * the actual container names for a stack — handles container_name overrides.
+ */
+async function getContainerNamesForStack(stackPath: string): Promise<string[]> {
+    try {
+        const res = await childProcessAsync.spawn(
+            "docker",
+            ["compose", "ps", "--format", "json"],
+            { encoding: "utf-8", cwd: stackPath }
+        );
+
+        const names: string[] = [];
+        const stdout = res.stdout?.toString() ?? "";
+
+        // docker compose ps --format json outputs one JSON object per line
+        for (const line of stdout.split("\n")) {
+            const t = line.trim();
+            if (!t) continue;
+            try {
+                const obj = JSON.parse(t);
+                if (obj.Name) names.push(obj.Name);
+            } catch { /* skip */ }
+        }
+
+        return names;
+    } catch {
+        return [];
+    }
 }
 
 export class ResourceUsageSocketHandler extends SocketHandler {
@@ -56,31 +105,25 @@ export class ResourceUsageSocketHandler extends SocketHandler {
                 checkLogin(socket);
                 if (typeof stackName !== "string") throw new Error("Invalid stack name.");
 
-                // Use --format with table-style JSON output, one object per line
-                const res = await childProcessAsync.spawn(
-                    "docker",
-                    ["stats", "--no-stream", "--format",
-                     "{\"Name\":\"{{.Name}}\",\"CPUPerc\":\"{{.CPUPerc}}\",\"MemUsage\":\"{{.MemUsage}}\",\"MemPerc\":\"{{.MemPerc}}\",\"NetIO\":\"{{.NetIO}}\",\"BlockIO\":\"{{.BlockIO}}\"}"],
-                    { encoding: "utf-8" }
-                );
+                const stackPath = path.join(server.stacksDir, stackName);
 
-                const allStats = parseDockerStats(res.stdout?.toString() ?? "");
+                // Get actual container names from docker compose - handles container_name overrides
+                const containerNames = await getContainerNamesForStack(stackPath);
 
-                // Docker Compose names containers: <stack>-<service>-<n>
-                // Match by prefix stackName + "-"
-                const containers = allStats.filter((c) =>
-                    c.name === stackName ||
-                    c.name.startsWith(stackName + "-") ||
-                    c.name.startsWith(stackName + "_")
-                );
+                if (containerNames.length === 0) {
+                    callback({ ok: true, stats: { stackName, containers: [], totalCpuPct: 0, totalMemUsageMB: 0 } });
+                    return;
+                }
+
+                const containers = await getStatsForContainers(containerNames);
 
                 callback({
                     ok: true,
                     stats: {
                         stackName,
                         containers,
-                        totalCpuPct: containers.reduce((s: number, c: any) => s + c.cpuPct, 0),
-                        totalMemUsageMB: containers.reduce((s: number, c: any) => s + c.memUsageMB, 0),
+                        totalCpuPct: containers.reduce((s, c) => s + c.cpuPct, 0),
+                        totalMemUsageMB: containers.reduce((s, c) => s + c.memUsageMB, 0),
                     },
                 });
             } catch (e) { callbackError(e, callback); }
@@ -90,27 +133,21 @@ export class ResourceUsageSocketHandler extends SocketHandler {
             try {
                 checkLogin(socket);
 
-                const res = await childProcessAsync.spawn(
-                    "docker",
-                    ["stats", "--no-stream", "--format",
-                     "{\"Name\":\"{{.Name}}\",\"CPUPerc\":\"{{.CPUPerc}}\",\"MemUsage\":\"{{.MemUsage}}\",\"MemPerc\":\"{{.MemPerc}}\",\"NetIO\":\"{{.NetIO}}\",\"BlockIO\":\"{{.BlockIO}}\"}"],
-                    { encoding: "utf-8" }
-                );
-
-                const allStats = parseDockerStats(res.stdout?.toString() ?? "");
-
-                // Group by stack name: containers named <stack>-<service>-<n>
+                const stackList = await Stack.getStackList(server, true);
                 const grouped: Record<string, any> = {};
-                for (const c of allStats) {
-                    // Extract stack name from container name
-                    const parts = c.name.split("-");
-                    const stackName = parts.length >= 2 ? parts.slice(0, -2).join("-") || parts[0] : c.name;
-                    if (!grouped[stackName]) {
-                        grouped[stackName] = { stackName, containers: [], totalCpuPct: 0, totalMemUsageMB: 0 };
-                    }
-                    grouped[stackName].containers.push(c);
-                    grouped[stackName].totalCpuPct += c.cpuPct;
-                    grouped[stackName].totalMemUsageMB += c.memUsageMB;
+
+                for (const [stackName, stack] of stackList) {
+                    if (!stack.isManagedByDockge) continue;
+                    const stackPath = path.join(server.stacksDir, stackName);
+                    const containerNames = await getContainerNamesForStack(stackPath);
+                    if (containerNames.length === 0) continue;
+                    const containers = await getStatsForContainers(containerNames);
+                    grouped[stackName] = {
+                        stackName,
+                        containers,
+                        totalCpuPct: containers.reduce((s, c) => s + c.cpuPct, 0),
+                        totalMemUsageMB: containers.reduce((s, c) => s + c.memUsageMB, 0),
+                    };
                 }
 
                 callback({ ok: true, stats: grouped });
